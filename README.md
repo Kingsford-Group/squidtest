@@ -29,7 +29,7 @@ export PATH=$(pwd)/tools/bin:${PATH}
 ```
 
 ### Workflow Description
-![image of workflow with simulation data](doc/simulation_workflow.png)
+![image of workflow with simulation data](doc/workflow_simulation.png)
 
 ### Re-producing the Result
 - To skip the simulating step, download the simulated data simulation_data00 and simulation_data01 from [here](https://cmu.box.com/s/e9u6alp73rfdhfve2a51p6v391vweodq). Decompress them by running the following command in terminal.
@@ -40,6 +40,7 @@ tar -xzvf simulation_data.tar.gz
 To move on with the workflow, we provide a script to do alignment and TSV calling. You can generate all results by running
 ```
 ./script/runSimulationData.sh <decompressed data folder> <number of threads>
+```
 
 - If you want to simulate your own data, make sure the optional software are in your path. We write a script to run simulation as in the manuscript. Simply run the following command. (The whole simulation may take more than 1 day to finish, be patient ^ ^)
 ```
