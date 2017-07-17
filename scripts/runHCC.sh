@@ -6,13 +6,6 @@ IntegrateInstallDir= # INTEGRATE installation directory
 OutputDir= # output files for SQUID and fusion gene detection tools on HCC1954/1395 cell lines
 ExeDir=$(pwd)
 
-# download genome fasta and annotation gtf
-mkdir -p ${OutputDir}/Ensemble75
-cd ${OutputDir}/Ensemble75
-wget ftp://ftp.ensembl.org/pub/release-75/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.75.dna_sm.primary_assembly.fa.gz
-wget ftp://ftp.ensembl.org/pub/release-75/gtf/homo_sapiens/Homo_sapiens.GRCh37.75.gtf.gz
-gunzip Homo_sapiens.GRCh37.75.dna_sm.primary_assembly.fa.gz
-gunzip Homo_sapiens.GRCh37.75.gtf.gz
 GenomeFasta=${OutputDir}/Ensemble75/Homo_sapiens.GRCh37.75.dna_sm.primary_assembly.fa
 AnnotationGTF=${OutputDir}/Ensemble75/Homo_sapiens.GRCh37.75.gtf.gz
 
@@ -28,15 +21,6 @@ gunzip ${ExeDir}/dataHCC/annot.ensembl.txt.gz
 mkdir -p ${OutputDir}/Ensemble75/IntegrateIndex
 ${IntegrateIntallDir}/bin/Integrate mkbwt -dir ${OutputDir}/Ensemble75/IntegrateIndex ${GenomeFasta}
 
-# download fastq file from SRA using fastq-dump
-cd ${ExeDir}/dataHCC
-fastq-dump --split-files SRR2532344 # HCC1954
-fastq-dump --split-files SRR925710 # HCC1954
-fastq-dump --split-files SRR2532336 # HCC1395
-
-cat SRR2532344_1.fastq SRR925710_1.fastq > RNAHCC1954_1.fastq
-cat SRR2532344_2.fastq SRR925710_2.fastq > RNAHCC1954_2.fastq
-
 cd $OutputDir
 # align reads using STAR
 mkdir -p StarAlign_1954
@@ -50,10 +34,12 @@ samtools view -Shb StarAlign_1395/Chimeric.out.sam -o StarAlign_1395/Chimeric.ou
 # SQUID
 mkdir -p squid_1954
 squid -b StarAlign_1954/Aligned.sortedByCoord.out.bam -c StarAlign_1954/Chimeric.out.bam -o squid_1954/squidtsv
+awk 'BEGIN{FS="\t";} {if(substr($0,0,1)=="#" || !($1~"M" || $1~"G" || $4~"M" || $4~"G")) print $0;}' squid_1954/squidtsv_sv.txt > squid_1954/squidtsv_sv_final.txt
 python3 VerifyFusionGene.py
 
 mkdir squid_1395
 squid -b StarAlign_1395/Aligned.sortedByCoord.out.bam -c StarAlign_1395/Chimeric.out.bam -o squid_1395/squidtsv
+awk 'BEGIN{FS="\t";} {if(substr($0,0,1)=="#" || !($1~"M" || $1~"G" || $4~"M" || $4~"G")) print $0;}' squid_1395/squidtsv_sv.txt > squid_1395/squidtsv_sv_final.txt
 
 # fusioncatcher
 mkdir -p fusioncatcher_1954
