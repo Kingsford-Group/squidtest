@@ -285,8 +285,8 @@ def OutputResult(accuracy, sensitivity, predSV, Result, IDs, outputfile):
 
 if __name__=="__main__":
 	if len(sys.argv)<3:
-		print("python VerifySQUID.py <option of 1-5> <TrueSV> <PredSV> <Outputfile> [<RNAbam> | <qual_threshold>]")
-		print("\t1: SQUIDdiscordant, RNAbam needed")
+		print("python VerifySQUID.py <option of 1-5> <TrueSV> <PredSV> <Outputfile>")
+		print("\t1: SQUID")
 		print("\t2: LUMPY")
 		print("\t3: BreakDancer")
 		print("\t4: HYDRA, qual_threshold needed")

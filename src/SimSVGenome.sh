@@ -168,5 +168,5 @@ fi
 
 # Calculating read-covered SV and output in new coordinate
 if $RNA ; then
-    ./bin/SV2newpos $ProjectDir/WholeGenome/genome_original.fa $ProjectDir/WholeGenome/ $ProjectDir/WholeGenome/SV_newpos.txt $ProjectDir/Reads/fluxsim.bed old $AnnotationFile
+    ./bin/SV2newpos $ProjectDir/WholeGenome/genome_original.fa $ProjectDir/WholeGenome/ $ProjectDir/WholeGenome/TSV_truepos.txt $ProjectDir/Reads/fluxsim.bed old $AnnotationFile
 fi

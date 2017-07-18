@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <string>
 #include <map>
-#include <boost/algorithm/string.hpp>
+#include "boost/algorithm/string.hpp"
 #include "GtfInterval.h"
 #include "SV.h"
 
