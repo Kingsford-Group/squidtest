@@ -6,6 +6,7 @@ sample_Output=""
 GTFfile=""
 threads=1
 
+argv=("$@")
 for ((i=0; i<${#argv}; i+2)); do
 	if [[ ${argv[i]} == "-p" ]]; then
 		threads=${argv[((i+1))]}
