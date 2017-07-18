@@ -19,20 +19,11 @@ Optional (you will need them for simulating RNA-seq reads and SVs):
 - [RSVsim](https://bioconductor.org/packages/release/bioc/html/RSVSim.html)
 - [Flux Simulator](http://sammeth.net/confluence/display/SIM/Home)
 
-The script build_simulation.sh will automatically download and install the above software.
-```
-./build_simulation.sh
-```
-
-Be sure to add these software into your path by running
-```
-export PATH=$(pwd)/tools/bin:${PATH}
-```
-
 ### Workflow Description
 ![image of workflow with simulation data](doc/workflow_simulation.png)
 
 ### Re-producing the Result
+Make sure that the above software are in your path.
 - To skip the simulating step, download the simulated data simulation_data00 and simulation_data01 from [here](https://cmu.box.com/s/e9u6alp73rfdhfve2a51p6v391vweodq). Decompress them by running the following command in terminal.
 ```
 cat simulation_data00 simulation_data01 > simulation_data.tar.gz

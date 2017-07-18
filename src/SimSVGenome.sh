@@ -153,8 +153,6 @@ if $RNA ; then
     mkdir Star_rearranged
     STAR --runThreadN 8 --genomeDir $ProjectDir/WholeGenome/STAR_genome_rearranged/ --readFilesIn $ProjectDir/Reads/RNA1.fastq.gz $ProjectDir/Reads/RNA2.fastq.gz --readFilesCommand gunzip -c --outFileNamePrefix Star_rearranged/ --outSAMtype BAM SortedByCoordinate --outReadsUnmapped Fastx --chimSegmentMin 20 --outSAMstrandField intronMotif --limitBAMsortRAM 21943468974
     samtools view -Shb Star_rearranged/Chimeric.out.sam > Star_rearranged/Chimeric.out.bam
-    # merge star concordant and chimeric alignment files
-    ./bin/MergeSTAR/extractSTAR.sh -b Star_rearranged/Aligned.sortedByCoord.out.bam -c Star_rearranged/Chimeric.out.bam
 fi
 
 # Alignment with speedseq

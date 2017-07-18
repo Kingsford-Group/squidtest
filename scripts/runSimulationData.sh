@@ -15,6 +15,10 @@ for ((i=2; i<9; i+=3)); do
 		fi
 		mkdir -p $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged
 		STAR --runThreadN ${threads} --genomeDir $DataFolder/SV${i}00_${j}/WholeGenome/STAR_genome_rearranged/ --readFilesIn $DataFolder/SV${i}00_${j}/Reads/RNA1.fq.gz $DataFolder/SV${i}00_${j}/Reads/RNA2.fq.gz --readFilesCommand gunzip -c --outFileNamePrefix $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/ --outSAMtype BAM SortedByCoordinate --outReadsUnmapped Fastx --chimSegmentMin 20 --outSAMstrandField intronMotif --limitBAMsortRAM 21943468974
+		samtools view -Shb $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Aligned.sortedByCoord.out.bam -o $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Chimeric.out.bam
+		samtools merge $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Merged_unsort.bam $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Aligned.sortedByCoord.out.bam $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Chimeric.out.bam
+		samtools sort $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Merged_unsort.bam -o $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Merged.bam
+		samtools index $DataFolder/SV${i}00_${j}/Alignments/Star_rearranged/Merged.bam
 
 		# Aligning reads with SpeedSeq
 		mkdir -p $DataFolder/SV${i}00_${j}/Alignments/SpeedSeq

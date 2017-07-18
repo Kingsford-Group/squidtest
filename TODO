@@ -1,4 +1,3 @@
 runWholeSimulation add script for downloading genome+annotation
 runWholeSimulation add argument for output dir
-write build_simulation.sh
 write doc/outputspec_simulation.md
