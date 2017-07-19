@@ -2,6 +2,8 @@
 
 args=("$@")
 OutDir=${args[0]}
+threads=${argv[1]}
+ExecutableDir=$(pwd)
 
 mkdir -p OutDir
 mkdir -p $OutDir/GRCh38
@@ -23,20 +25,25 @@ awk 'BEGIN{FS="\t";OFS="\t"}{split($NF,a," ");pfx="";s="";for(i=1;i<=length(a);i
 GenomeDir=${OutDir}/GRCh38/Chromosomes
 AnnotationFile=${OutDir}/GRCh38/Annotation/genes_clean.gtf
 
+cd ${ExecutableDir}
 for ((i=200}; i<900; i+=300)); do
 	mkdir -p ${OutDir}/SVRNA${i}_1
 	mkdir -p ${OutDir}/SVRNA${i}_2
 	mkdir -p ${OutDir}/SVRNA${i}_3
 	mkdir -p ${OutDir}/SVRNA${i}_4
-	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_1 -a ${AnnotationFile} -seq 21 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA
-	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_2 -a ${AnnotationFile} -seq 25 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA
-	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_3 -a ${AnnotationFile} -seq 28 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA
-	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_4 -a ${AnnotationFile} -seq 30 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA
+	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_1 -a ${AnnotationFile} -seq 21 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA -threads ${threads}
+	cd ${ExecutableDir}
+	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_2 -a ${AnnotationFile} -seq 25 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA -threads ${threads}
+	cd ${ExecutableDir}
+	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_3 -a ${AnnotationFile} -seq 28 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA -threads ${threads}
+	cd ${ExecutableDir}
+	./bin/SimSVGenome.sh -g ${GenomeDir} -p ${OutDir}/SVRNA${i}_4 -a ${AnnotationFile} -seq 30 -inv ${i} -ins ${i} -del ${i} -dup ${i} -tra 2 -RNA -threads ${threads}
+	cd ${ExecutableDir}
 done
 
 for ((i=200; i<900; i+=300)); do
-	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_1
-	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_2
-	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_3
-	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_4
+	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_1 -threads ${threads}
+	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_2 -threads ${threads}
+	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_3 -threads ${threads}
+	./bin/SVcalling.sh -p ${OutDir}/SVRNA${i}_4 -threads ${threads}
 done

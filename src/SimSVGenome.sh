@@ -1,6 +1,7 @@
 #!/bin/bash
 
 args=("$@")
+threads=2
 for (( i=0; i<${#args[@]}; )); do
     if [ ${args[$i]} = "-g" ]; then
         if [[ ${args[$(($i+1))]} = /* || ${args[$(($i+1))]} = ~* ]]; then
@@ -47,6 +48,9 @@ for (( i=0; i<${#args[@]}; )); do
     elif [ ${args[$i]} = "-WGS" ]; then
         RNA=false
         ((i++))
+    elif [[ ${args[$i]} == "-threads" ]]; then
+        threads=${args[$(($i+1))]}
+        ((i+=2))
     fi
 done
 
@@ -101,7 +105,7 @@ Rscript simSV.R
 mv genome_rearranged.fasta genome_rearranged.fa
 if $RNA ; then
     mkdir STAR_genome_rearranged
-    STAR --runThreadN 8 --runMode genomeGenerate --genomeDir STAR_genome_rearranged --genomeFastaFiles genome_rearranged.fa
+    STAR --runThreadN ${threads} --runMode genomeGenerate --genomeDir STAR_genome_rearranged --genomeFastaFiles genome_rearranged.fa
     mv Log.out STAR_genome_rearranged/Log.out
 fi
 
@@ -151,7 +155,7 @@ fi
 cd $ProjectDir/Alignments
 if $RNA ; then
     mkdir Star_rearranged
-    STAR --runThreadN 8 --genomeDir $ProjectDir/WholeGenome/STAR_genome_rearranged/ --readFilesIn $ProjectDir/Reads/RNA1.fastq.gz $ProjectDir/Reads/RNA2.fastq.gz --readFilesCommand gunzip -c --outFileNamePrefix Star_rearranged/ --outSAMtype BAM SortedByCoordinate --outReadsUnmapped Fastx --chimSegmentMin 20 --outSAMstrandField intronMotif --limitBAMsortRAM 21943468974
+    STAR --runThreadN ${threads} --genomeDir $ProjectDir/WholeGenome/STAR_genome_rearranged/ --readFilesIn $ProjectDir/Reads/RNA1.fastq.gz $ProjectDir/Reads/RNA2.fastq.gz --readFilesCommand gunzip -c --outFileNamePrefix Star_rearranged/ --outSAMtype BAM SortedByCoordinate --outReadsUnmapped Fastx --chimSegmentMin 20 --outSAMstrandField intronMotif --limitBAMsortRAM 21943468974
     samtools view -Shb Star_rearranged/Chimeric.out.sam > Star_rearranged/Chimeric.out.bam
     samtools merge Star_rearranged/Merged_unsort.bam Star_rearranged/Aligned.sortedByCoord.out.bam Star_rearranged/Chimeric.out.bam
     samtools sort Star_rearranged/Merged_unsort.bam -o Star_rearranged/Merged.bam
@@ -161,9 +165,9 @@ fi
 # Alignment with speedseq
 mkdir SpeedSeq
 if $RNA ; then
-    speedseq align -R "@RG\tID:id\tSM:samplename\tLB:lib" -t 8 -o SpeedSeq/Aligned $ProjectDir/WholeGenome/genome_rearranged.fa $ProjectDir/Reads/RNA1.fastq.gz $ProjectDir/Reads/RNA2.fastq.gz
+    speedseq align -R "@RG\tID:id\tSM:samplename\tLB:lib" -t ${threads} -o SpeedSeq/Aligned $ProjectDir/WholeGenome/genome_rearranged.fa $ProjectDir/Reads/RNA1.fastq.gz $ProjectDir/Reads/RNA2.fastq.gz
 else
-    speedseq align -R "@RG\tID:id\tSM:samplename\tLB:lib" -t 8 -o SpeedSeq/Aligned $ProjectDir/WholeGenome/genome_rearranged.fa $ProjectDir/Reads/WGS1.fq $ProjectDir/Reads/WGS2.fq
+    speedseq align -R "@RG\tID:id\tSM:samplename\tLB:lib" -t ${threads} -o SpeedSeq/Aligned $ProjectDir/WholeGenome/genome_rearranged.fa $ProjectDir/Reads/WGS1.fq $ProjectDir/Reads/WGS2.fq
 fi
 
 # Calculating read-covered SV and output in new coordinate
