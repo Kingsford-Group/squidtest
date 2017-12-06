@@ -390,6 +390,28 @@ def ReadIntegrate(filename):
 	fp.close()
 	return SVs
 
+def ReadSoapfuse(filename):
+	SVs=[]
+	fp=open(filename, 'r')
+	linecount=0
+	for line in fp:
+		linecount+=1
+		if linecount==1:
+			continue
+		strs=line.strip().split("\t")
+		if strs[2]=="-":
+			bp1=BP_t(strs[1], int(strs[3]), True)
+		else:
+			bp1=BP_t(strs[1], int(strs[3]), False)
+		if strs[7]=="+":
+			bp2=BP_t(strs[6], int(strs[8]), True)
+		else:
+			bp2=BP_t(strs[6], int(strs[8]), False)
+		sv=SV_t(bp1, bp2)
+		SVs.append(sv)
+	fp.close()
+	return SVs
+
 def AnnotatebyGenes(SVs, Genes):
 	Annot=[0]*len(SVs)
 	HitGene1=[False]*len(SVs)
@@ -526,7 +548,7 @@ def WriteAnnot(SVs, HitGene1, HitGene2, Orientation1, Orientation2, outputfile):
 
 if __name__=="__main__":
 	if len(sys.argv)<5:
-		print("python AnnotTrueSV.py <choice from 1-3> <TrueSV/PredSV> <GTFfile> <Output> (<RNAbam>)")
+		print("python AnnotSV.py <choice from 1-8> <TrueSV/PredSV> <GTFfile> <Output> (<RNAbam>)")
 		print("\t1: True SV")
 		print("\t2: SQUID_discordantedges.txt")
 		print("\t3: FusionCatcher")
@@ -534,6 +556,7 @@ if __name__=="__main__":
 		print("\t5: Defuse")
 		print("\t6: Chimerascan")
 		print("\t7: INTEGRATE")
+		print("\t8: SOAPfuse")
 	else:
 		SVFile=sys.argv[2]
 		GTFfile=sys.argv[3]
@@ -555,6 +578,8 @@ if __name__=="__main__":
 			SVs=ReadChimerascan(SVFile)
 		elif sys.argv[1]=='7':
 			SVs=ReadIntegrate(SVFile)
+		elif sys.argv[1]=='8':
+			SVs=ReadSoapfuse(SVFile)
 		# [Annot, Orientation]=AnnotatebyGTF(SVs, GTFfile)
 		Genes=ReadGTF(GTFfile)
 		[HitGene1, HitGene2, Orientation1, Orientation2]=AnnotatebyGenes(SVs, Genes)

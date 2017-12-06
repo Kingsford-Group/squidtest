@@ -29,6 +29,12 @@ public:
 		if(EndPos!=rhs.EndPos)
 			return EndPos<rhs.EndPos;
 	};
+	bool operator == (const Interval_t& rhs) const{
+		return (Chr==rhs.Chr && StartPos==rhs.StartPos && EndPos==rhs.EndPos && Strand==rhs.Strand);
+	};
+	static bool WeakEqual (const Interval_t& lhs, const Interval_t& rhs) {
+		return (lhs.Chr==rhs.Chr && lhs.StartPos==rhs.StartPos && lhs.EndPos==rhs.EndPos);
+	};
 	static bool TransIDComp(const Interval_t& lhs, const Interval_t& rhs) {
 		return lhs.TransID<rhs.TransID;
 	};

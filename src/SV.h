@@ -13,6 +13,8 @@
 
 using namespace std;
 
+class Transcript_t;
+
 struct SV_t{
 public:
     vector<SimpleSV_t> vSimpleSV;
@@ -46,7 +48,10 @@ public:
     void WriteFilterednewSVPos(vector<string>& RefName, map<int,int>& RefLength, string outputfile);
     void WriteFilteredoldSVPos(vector<string>& RefName, map<int,int>& RefLength, string outputfile);
     bool IsIntersect(SV_t svrhs);
-    void IsCoveredbyReads(string bedfile, map<string,int>& RefTable, map<int,int>& RefLength, vector<string>& TransName, bool is_old_coordicate, int threshold=2);
+    void IsCoveredbyReads(string bedfile, map<string,int>& RefTable, map<int,int>& RefLength, vector<string>& TransName, bool is_old_coordicate, int threshold=4);
+    void IsCoveredbyPolyester(string fastafile, vector<Transcript_t>& vTrans, map<int,int>& RefLength, vector<string>& TransName, bool is_old_coordicate, int threshold=4);
 };
+
+vector< pair<int,int> > Convert2GenomeCoord(pair<int,int> interval, Transcript_t& currenttrans);
 
 #endif

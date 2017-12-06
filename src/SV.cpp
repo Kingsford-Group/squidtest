@@ -1,4 +1,5 @@
 #include "SV.h"
+#include "GtfTrans.h"
 
 using namespace std;
 
@@ -409,7 +410,50 @@ bool SV_t::IsIntersect(SV_t svrhs){
     return Intersect;
 };
 
-void SV_t::IsCoveredbyReads(string bedfile, map<string,int>& RefTable, map<int,int>& RefLength, vector<string>& TransName, bool is_old_coordicate, int threshold){
+vector< pair<int,int> > Convert2GenomeCoord(pair<int,int> interval, Transcript_t& currenttrans)
+{
+    vector< pair<int,int> > newintervals;
+    if(currenttrans.Strand=='+'){
+        int newintvlstart=interval.first;
+        int exonidx=0;
+        int totallen=0;
+        while(newintvlstart<interval.second){
+            while(totallen+currenttrans.vExon[exonidx].EndPos-currenttrans.vExon[exonidx].StartPos<=newintvlstart){
+                totallen+=currenttrans.vExon[exonidx].EndPos-currenttrans.vExon[exonidx].StartPos;
+                exonidx++;
+            }
+            assert(exonidx < (int)currenttrans.vExon.size());
+            int step=min(interval.second-newintvlstart, currenttrans.vExon[exonidx].EndPos-currenttrans.vExon[exonidx].StartPos-(newintvlstart-totallen));
+            int newend=newintvlstart+step;
+            newintervals.push_back(make_pair(currenttrans.vExon[exonidx].StartPos+newintvlstart-totallen, currenttrans.vExon[exonidx].StartPos+newend-totallen));
+            assert(newintervals.back().first<=currenttrans.vExon[exonidx].EndPos && newintervals.back().second<=currenttrans.vExon[exonidx].EndPos);
+            newintvlstart=newend;
+        }
+    }
+    else{
+        int newintvlstart=interval.first;
+        int exonidx=(int)currenttrans.vExon.size()-1;
+        int totallen=0;
+        while(newintvlstart<interval.second){
+            while(totallen+currenttrans.vExon[exonidx].EndPos-currenttrans.vExon[exonidx].StartPos<=newintvlstart){
+                totallen+=currenttrans.vExon[exonidx].EndPos-currenttrans.vExon[exonidx].StartPos;
+                exonidx--;
+            }
+            if(exonidx<0)
+                cout<<"watch here\n";
+            assert(exonidx>=0);
+            int step=min(interval.second-newintvlstart, currenttrans.vExon[exonidx].EndPos-currenttrans.vExon[exonidx].StartPos-(newintvlstart-totallen));
+            int newend=newintvlstart+step;
+            newintervals.push_back(make_pair(currenttrans.vExon[exonidx].EndPos-(newintvlstart-totallen), currenttrans.vExon[exonidx].EndPos-(newend-totallen)));
+            assert(newintervals.back().first>=currenttrans.vExon[exonidx].StartPos && newintervals.back().second>=currenttrans.vExon[exonidx].StartPos);
+            newintvlstart=newend;
+        }
+        reverse(newintervals.begin(), newintervals.end());
+    }
+    return newintervals;
+};
+
+void SV_t::IsCoveredbyPolyester(string fastafile, vector<Transcript_t>& vTrans, map<int,int>& RefLength, vector<string>& TransName, bool is_old_coordicate, int threshold){
     if(is_old_coordicate && updated)
         Update2NewPos(RefLength);
     else if(!is_old_coordicate && !updated)
@@ -418,156 +462,203 @@ void SV_t::IsCoveredbyReads(string bedfile, map<string,int>& RefTable, map<int,i
     vTRAReads.clear(); vTRAReads.resize(vTRA.size(), false);
     vector<int> countSimpleReads(vSimpleSV.size(), 0);
     vector<int> countTRAReads(vTRA.size(), 0);
+    // learn read length from simulated fasta file
+    int readlen=0;
 
-    clock_t starttime=clock();
-    double duration;
-    ifstream input(bedfile);
+    // process transcripts vector for quick access with transcript name
+    map<string,int> TransIndexMap;
+    for(int i=0; i<vTrans.size(); i++)
+        TransIndexMap[vTrans[i].TransID]=i;
+
+    ifstream input(fastafile);
     string line;
-    bool can_getline=getline(input, line);
-    int readnum=0;
-    while(can_getline){
-        vector<int> Positions, Lengths;
-        int numfirstread=0, readchr=0;
-        vector<string> read1str, read2str, blocklen, offset;
-        boost::split(read1str, line, boost::is_any_of("\t"));
-        can_getline=getline(input, line);
-        boost::split(read2str, line, boost::is_any_of("\t"));
-        can_getline=getline(input, line);
-        readnum++;
-        if(readnum%1000000==0){
-            duration=1.0*(clock()-starttime)/CLOCKS_PER_SEC;
-            cout<<readnum<<"\tused time "<<duration<<endl;
-        }
-        readchr=RefTable[read1str[0]];
-        // read 1
-        if(read1str.size()>10){
-            boost::split(blocklen, read1str[10], boost::is_any_of(","));
-            boost::split(offset, read1str[11], boost::is_any_of(","));
-            for(int i=0; i<offset.size(); i++){
-                Positions.push_back(stoi(read1str[1])+stoi(offset[i]));
-                Lengths.push_back(stoi(blocklen[i]));
-            }
-            numfirstread=blocklen.size();
-        }
-        else{
-            Positions.push_back(stoi(read1str[1]));
-            Lengths.push_back(stoi(read1str[2])-stoi(read1str[1]));
-            numfirstread=1;
-        }
-        // read 2
-        if(read2str.size()>10){
-            boost::split(blocklen, read2str[10], boost::is_any_of(","));
-            boost::split(offset, read2str[11], boost::is_any_of(","));
-            for(int i=0; i<offset.size(); i++){
-                Positions.push_back(stoi(read2str[1])+stoi(offset[i]));
-                Lengths.push_back(stoi(blocklen[i]));
-            }
-        }
-        else{
-            Positions.push_back(stoi(read2str[1]));
-            Lengths.push_back(stoi(read2str[2])-stoi(read2str[1]));
-        }
-        // skip reads that have too many segments
-        if(numfirstread>2)
+    while(getline(input,line)){
+        if(line[0]!='>')
             continue;
+        vector<string> strs;
+        boost::split(strs, line, boost::is_any_of(";"));
+
+        size_t s=strs[0].find_first_of('/');
+        string transname=strs[0].substr(s+1);
+        Transcript_t& currenttrans=vTrans[TransIndexMap[transname]];
+        int readchr=currenttrans.Chr;
+        // get mate 1 and 2 intervals in transcript coordinate
+        pair<int,int> mate1_interval_ori;
+        pair<int,int> mate2_interval_ori;
+        assert(strs[1].substr(0, 5)=="mate1" && strs[2].substr(0,5)=="mate2");
+        if(strs[1][5]==':'){
+            strs[1]=strs[1].substr(6);
+            vector<string> mate1str;
+            boost::split(mate1str, strs[1], boost::is_any_of("-"));
+            assert(mate1str.size()>1);
+            mate1_interval_ori=make_pair(stoi(mate1str[0])-1, stoi(mate1str[1]));
+            if(readlen==0)
+                readlen = mate1_interval_ori.second-mate1_interval_ori.first;
+        }
+        else if(strs[1].substr(5,6)=="Start:"){
+            strs[1]=strs[1].substr(11);
+            mate1_interval_ori=make_pair(stoi(strs[1])-1, stoi(strs[1])-1+readlen);
+            // check corresponding transcript length
+            int translen=0;
+            for(int i=0; i<currenttrans.vExon.size(); i++)
+                translen+=currenttrans.vExon[i].EndPos-currenttrans.vExon[i].StartPos;
+            if(translen<readlen)
+                mate1_interval_ori.second=stoi(strs[1])-1+translen;
+        }
+        else
+            cout<<"Invalid format"<<line<<endl;
+        if(strs[2][5]==':'){
+            strs[2]=strs[2].substr(6);
+            vector<string> mate2str;
+            boost::split(mate2str, strs[2], boost::is_any_of("-"));
+            assert(mate2str.size()>1);
+            mate2_interval_ori=make_pair(stoi(mate2str[0])-1, stoi(mate2str[1]));
+            if(readlen==0)
+                readlen = mate2_interval_ori.second-mate2_interval_ori.first;
+        }
+        else if(strs[2].substr(5,6)=="Start:"){
+            strs[2]=strs[2].substr(11);
+            mate2_interval_ori=make_pair(stoi(strs[2])-1, stoi(strs[2])-1+readlen);
+            // check corresponding transcript length
+            int translen=0;
+            for(int i=0; i<currenttrans.vExon.size(); i++)
+                translen+=currenttrans.vExon[i].EndPos-currenttrans.vExon[i].StartPos;
+            if(translen<readlen)
+                mate2_interval_ori.second=stoi(strs[1])-1+translen;
+        }
+        else
+            cout<<"Invalid format"<<line<<endl;
+
+        //  convert mate 1 and 2 positions into genomic coordinate
+        vector< pair<int,int> > mate1_interval_conv=Convert2GenomeCoord(mate1_interval_ori, currenttrans);
+        vector< pair<int,int> > mate2_interval_conv=Convert2GenomeCoord(mate2_interval_ori, currenttrans);
+        int numfirstread=mate1_interval_conv.size();
+        vector<int> Positions;
+        vector<int> Lengths;
+        for(vector< pair<int,int> >::iterator it=mate1_interval_conv.begin(); it!=mate1_interval_conv.end(); it++){
+            Positions.push_back(it->first);
+            Lengths.push_back(it->second - it->first);
+        }
+        for(vector< pair<int,int> >::iterator it=mate2_interval_conv.begin(); it!=mate2_interval_conv.end(); it++){
+            if(currenttrans.Strand=='+'){
+                Positions.push_back(it->first);
+                Lengths.push_back(it->second - it->first);
+            }
+            else{
+                Positions.insert(Positions.begin(), it->first);
+                Lengths.insert(Lengths.begin(), it->second - it->first);
+            }
+        }
+
+        // variables to keep track of which TSVs are supported
         vector<int> SimpleIdxList;
         vector<int> TRAIdxList;
-        // find in SV lists
         bool SupportingBP=false;
+
+        // check simple SVs
         for(int i=0; i<vSimpleSV.size(); i++){
+            if(strs[0].substr(0,12)==">read2307089" && vSimpleSV[i].ID==327)
+                cout<<"watch here\n";
             if(readchr!=vSimpleSV[i].RefID)
                 continue;
             for(int j=0; j<Positions.size(); j++)
                 if((Positions[j]<vSimpleSV[i].StartPos-10 && Positions[j]+Lengths[j]>vSimpleSV[i].StartPos+10) || (Positions[j]<vSimpleSV[i].EndPos-10 && Positions[j]+Lengths[j]>vSimpleSV[i].EndPos+10)){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
             for(int j=0; j<Positions.size()-1; j++){
                 if(Positions[j]+Lengths[j]<vSimpleSV[i].StartPos+10 && Positions[j+1]>vSimpleSV[i].StartPos-10 && Positions[j+1]+Lengths[j+1]<vSimpleSV[i].EndPos+10){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
                 else if(Positions[j]>vSimpleSV[i].StartPos-10 && Positions[j]+Lengths[j]<vSimpleSV[i].EndPos+10 && Positions[j+1]>vSimpleSV[i].EndPos-10){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
             }
-            if(Positions[0]<Positions[numfirstread]){
+            if(numfirstread<Positions.size() && Positions[0]<Positions[numfirstread]){
                 if(Positions[0]+Lengths[0]<vSimpleSV[i].StartPos+10 && Positions.back()>vSimpleSV[i].StartPos-10 && Positions.back()+Lengths.back()<vSimpleSV[i].EndPos+10){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
                 else if(Positions[0]>vSimpleSV[i].StartPos-10 && Positions[0]+Lengths[0]<vSimpleSV[i].EndPos+10 && Positions.back()>vSimpleSV[i].EndPos-10){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
             }
-            else{
+            else if(numfirstread<Positions.size()){
                 if(Positions[numfirstread]+Lengths[numfirstread]<vSimpleSV[i].StartPos+10 && Positions[numfirstread-1]>vSimpleSV[i].StartPos-10 && Positions[numfirstread-1]+Lengths[numfirstread-1]<vSimpleSV[i].EndPos+10){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
                 else if(Positions[numfirstread]>vSimpleSV[i].StartPos-10 && Positions[numfirstread]+Lengths[numfirstread]<vSimpleSV[i].EndPos+10 && Positions[numfirstread-1]>vSimpleSV[i].EndPos-10){
                     SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
                     SupportingBP=true;
                 }
             }
         }
+        // check TRAs
         for(int i=0; i<vTRA.size(); i++){
             if(readchr!=vTRA[i].Ref1 && readchr!=vTRA[i].Ref2)
                 continue;
             for(int j=0; j<Positions.size(); j++)
                 if((readchr==vTRA[i].Ref1 && Positions[j]<vTRA[i].Pos1-10 && Positions[j]+Lengths[j]>vTRA[i].Pos1+10) || (readchr==vTRA[i].Ref2 && Positions[j]<vTRA[i].Pos2-10 && Positions[j]+Lengths[j]>vTRA[i].Pos2+10)){
                     TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
                     SupportingBP=true;
                 }
             for(int j=0; j<Positions.size()-1; j++)
                 if((readchr==vTRA[i].Ref1 && Positions[j]+Lengths[j]<vTRA[i].Pos1+10 && Positions[j+1]>vTRA[i].Pos1-10) || (readchr==vTRA[i].Ref2 && Positions[j]+Lengths[j]<vTRA[i].Pos2+10 && Positions[j+1]>vTRA[i].Pos2-10)){
-                    TRAIdxList.push_back(j);
+                    TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
                     SupportingBP=true;
                 }
-            if(Positions[0]<Positions[numfirstread]){
+            if(numfirstread<Positions.size() && Positions[0]<Positions[numfirstread]){
                 if((readchr==vTRA[i].Ref1 && Positions[0]+Lengths[0]<vTRA[i].Pos1+10 && Positions.back()>vTRA[i].Pos1-10) || (readchr==vTRA[i].Ref2 && Positions[0]+Lengths[0]<vTRA[i].Pos2+10 && Positions.back()>vTRA[i].Pos2-10)){
                     TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
                     SupportingBP=true;
                 }
             }
-            else{
+            else if(numfirstread<Positions.size()){
                 if((readchr==vTRA[i].Ref1 && Positions[numfirstread]+Lengths[numfirstread]<vTRA[i].Pos1+10 && Positions[numfirstread-1]>vTRA[i].Pos1-10) || (readchr==vTRA[i].Ref2 && Positions[numfirstread]+Lengths[numfirstread]<vTRA[i].Pos2+10 && Positions[numfirstread-1]>vTRA[i].Pos2-10)){
                     TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
                     SupportingBP=true;
                 }
             }
         }
-        if(SupportingBP){
-            vector<string> readnameinfo;
-            boost::split(readnameinfo, read1str[3], boost::is_any_of(":"));
-            TransName.push_back(readnameinfo[2]);
-        }
-        vector<int>::iterator endit;
+        if(SupportingBP)
+            TransName.push_back(transname);
+        // add to count
         sort(SimpleIdxList.begin(), SimpleIdxList.end());
-        endit=unique(SimpleIdxList.begin(), SimpleIdxList.end());
-        SimpleIdxList.resize(distance(SimpleIdxList.begin(), endit));
+        SimpleIdxList.resize(distance(SimpleIdxList.begin(), unique(SimpleIdxList.begin(), SimpleIdxList.end())));
         sort(TRAIdxList.begin(), TRAIdxList.end());
-        endit=unique(TRAIdxList.begin(), TRAIdxList.end());
-        TRAIdxList.resize(distance(TRAIdxList.begin(), endit));
-        for(int i=0; i<SimpleIdxList.size(); i++)
+        TRAIdxList.resize(distance(TRAIdxList.begin(), unique(TRAIdxList.begin(), TRAIdxList.end())));
+        for(int i=0; i<SimpleIdxList.size(); i++){
             countSimpleReads[SimpleIdxList[i]]++;
-        for(int i=0; i<TRAIdxList.size(); i++)
+        }
+        for(int i=0; i<TRAIdxList.size(); i++){
             countTRAReads[TRAIdxList[i]]++;
+        }
     }
+    input.close();
 
-    sort(TransName.begin(), TransName.end());
-    vector<string>::iterator endittrans=unique(TransName.begin(), TransName.end());
-    TransName.resize(distance(TransName.begin(), endittrans));
-
-    // for same SV ID, if one is covered by reads, mark the others covered.
+    // mark TSVs to be supported
     for(int i=0; i<countSimpleReads.size(); i++)
         if(countSimpleReads[i]>threshold)
             vSimpleReads[i]=true;
     for(int i=0; i<countTRAReads.size(); i++)
         if(countTRAReads[i]>threshold)
             vTRAReads[i]=true;
+    // for same SV ID, if one is covered by reads, mark the others covered.
     int idcount=0;
     for(int i=0; i<vSimpleSV.size(); i++)
         if(idcount<vSimpleSV[i].ID)
@@ -592,4 +683,281 @@ void SV_t::IsCoveredbyReads(string bedfile, map<string,int>& RefTable, map<int,i
                     vTRAReads[j]=true;
         }
     }
+    // trim transname
+    sort(TransName.begin(), TransName.end());
+    vector<string>::iterator endittrans=unique(TransName.begin(), TransName.end());
+    TransName.resize(distance(TransName.begin(), endittrans));
+};
+
+void SV_t::IsCoveredbyReads(string bedfile, map<string,int>& RefTable, map<int,int>& RefLength, vector<string>& TransName, bool is_old_coordicate, int threshold){
+    if(is_old_coordicate && updated)
+        Update2NewPos(RefLength);
+    else if(!is_old_coordicate && !updated)
+        Update2NewPos(RefLength);
+    vSimpleReads.clear(); vSimpleReads.resize(vSimpleSV.size(), false);
+    vTRAReads.clear(); vTRAReads.resize(vTRA.size(), false);
+    vector< vector< vector<int> > > countSimpleReads(vSimpleSV.size());
+    vector< vector< vector<int> > > countTRAReads(vTRA.size());
+    vector< vector<string> > readnameSimpleReads(vSimpleSV.size());
+    vector< vector<string> > readnameTRAReads(vTRA.size());
+
+    int actualsupport=0;
+
+    clock_t starttime=clock();
+    double duration;
+    ifstream input(bedfile);
+    string line;
+    bool can_getline=getline(input, line);
+    int readnum=0;
+    while(can_getline){
+        vector<int> Positions, Lengths;
+        int numfirstread=0, readchr=0;
+        vector<string> read1str, read2str, blocklen, offset;
+        boost::split(read1str, line, boost::is_any_of("\t"));
+        can_getline=getline(input, line);
+        boost::split(read2str, line, boost::is_any_of("\t"));
+        can_getline=getline(input, line);
+        readnum++;
+        if(readnum%1000000==0){
+            duration=1.0*(clock()-starttime)/CLOCKS_PER_SEC;
+            cout<<readnum<<"\tused time "<<duration<<endl;
+        }
+        readchr=RefTable[read1str[0]];
+        // read 1
+        if(read1str.size()>10){
+            if(read1str[0]!="polyA"){
+                boost::split(blocklen, read1str[10], boost::is_any_of(","));
+                boost::split(offset, read1str[11], boost::is_any_of(","));
+                for(int i=0; i<offset.size(); i++){
+                    Positions.push_back(stoi(read1str[1])+stoi(offset[i]));
+                    Lengths.push_back(stoi(blocklen[i]));
+                }
+            }
+            numfirstread=blocklen.size();
+        }
+        else{
+            Positions.push_back(stoi(read1str[1]));
+            Lengths.push_back(stoi(read1str[2])-stoi(read1str[1]));
+            numfirstread=1;
+        }
+        // read 2
+        if(read2str.size()>10){
+            if(read2str[0]!="polyA"){
+                boost::split(blocklen, read2str[10], boost::is_any_of(","));
+                boost::split(offset, read2str[11], boost::is_any_of(","));
+                for(int i=0; i<offset.size(); i++){
+                    Positions.push_back(stoi(read2str[1])+stoi(offset[i]));
+                    Lengths.push_back(stoi(blocklen[i]));
+                }
+            }
+        }
+        else{
+            Positions.push_back(stoi(read2str[1]));
+            Lengths.push_back(stoi(read2str[2])-stoi(read2str[1]));
+        }
+        // skip reads where both ends are polyA
+        if(Positions.size()==0)
+            continue;
+        // skip reads that have too many segments
+        if(numfirstread>2)
+            continue;
+        vector<int> SimpleIdxList;
+        vector<int> TRAIdxList;
+        // find in SV lists
+        bool SupportingBP=false;
+        for(int i=0; i<vSimpleSV.size(); i++){
+            if(readchr!=vSimpleSV[i].RefID)
+                continue;
+            for(int j=0; j<Positions.size(); j++)
+                if((Positions[j]<vSimpleSV[i].StartPos-10 && Positions[j]+Lengths[j]>vSimpleSV[i].StartPos+10) || (Positions[j]<vSimpleSV[i].EndPos-10 && Positions[j]+Lengths[j]>vSimpleSV[i].EndPos+10)){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+            for(int j=0; j<Positions.size()-1; j++){
+                if(Positions[j]+Lengths[j]<vSimpleSV[i].StartPos+10 && Positions[j+1]>vSimpleSV[i].StartPos-10 && Positions[j+1]+Lengths[j+1]<vSimpleSV[i].EndPos+10){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+                else if(Positions[j]>vSimpleSV[i].StartPos-10 && Positions[j]+Lengths[j]<vSimpleSV[i].EndPos+10 && Positions[j+1]>vSimpleSV[i].EndPos-10){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+            }
+            if(numfirstread<Positions.size() && Positions[0]<Positions[numfirstread]){
+                if(Positions[0]+Lengths[0]<vSimpleSV[i].StartPos+10 && Positions.back()>vSimpleSV[i].StartPos-10 && Positions.back()+Lengths.back()<vSimpleSV[i].EndPos+10){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+                else if(Positions[0]>vSimpleSV[i].StartPos-10 && Positions[0]+Lengths[0]<vSimpleSV[i].EndPos+10 && Positions.back()>vSimpleSV[i].EndPos-10){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+            }
+            else if(numfirstread<Positions.size()){
+                if(Positions[numfirstread]+Lengths[numfirstread]<vSimpleSV[i].StartPos+10 && Positions[numfirstread-1]>vSimpleSV[i].StartPos-10 && Positions[numfirstread-1]+Lengths[numfirstread-1]<vSimpleSV[i].EndPos+10){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+                else if(Positions[numfirstread]>vSimpleSV[i].StartPos-10 && Positions[numfirstread]+Lengths[numfirstread]<vSimpleSV[i].EndPos+10 && Positions[numfirstread-1]>vSimpleSV[i].EndPos-10){
+                    SimpleIdxList.push_back(i);
+                    assert(i<vSimpleSV.size());
+                    SupportingBP=true;
+                }
+            }
+        }
+        for(int i=0; i<vTRA.size(); i++){
+            if(readchr!=vTRA[i].Ref1 && readchr!=vTRA[i].Ref2)
+                continue;
+            for(int j=0; j<Positions.size(); j++)
+                if((readchr==vTRA[i].Ref1 && Positions[j]<vTRA[i].Pos1-10 && Positions[j]+Lengths[j]>vTRA[i].Pos1+10) || (readchr==vTRA[i].Ref2 && Positions[j]<vTRA[i].Pos2-10 && Positions[j]+Lengths[j]>vTRA[i].Pos2+10)){
+                    TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
+                    SupportingBP=true;
+                }
+            for(int j=0; j<Positions.size()-1; j++)
+                if((readchr==vTRA[i].Ref1 && Positions[j]+Lengths[j]<vTRA[i].Pos1+10 && Positions[j+1]>vTRA[i].Pos1-10) || (readchr==vTRA[i].Ref2 && Positions[j]+Lengths[j]<vTRA[i].Pos2+10 && Positions[j+1]>vTRA[i].Pos2-10)){
+                    TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
+                    SupportingBP=true;
+                }
+            if(numfirstread<Positions.size() && Positions[0]<Positions[numfirstread]){
+                if((readchr==vTRA[i].Ref1 && Positions[0]+Lengths[0]<vTRA[i].Pos1+10 && Positions.back()>vTRA[i].Pos1-10) || (readchr==vTRA[i].Ref2 && Positions[0]+Lengths[0]<vTRA[i].Pos2+10 && Positions.back()>vTRA[i].Pos2-10)){
+                    TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
+                    SupportingBP=true;
+                }
+            }
+            else if(numfirstread<Positions.size()){
+                if((readchr==vTRA[i].Ref1 && Positions[numfirstread]+Lengths[numfirstread]<vTRA[i].Pos1+10 && Positions[numfirstread-1]>vTRA[i].Pos1-10) || (readchr==vTRA[i].Ref2 && Positions[numfirstread]+Lengths[numfirstread]<vTRA[i].Pos2+10 && Positions[numfirstread-1]>vTRA[i].Pos2-10)){
+                    TRAIdxList.push_back(i);
+                    assert(i<vTRA.size());
+                    SupportingBP=true;
+                }
+            }
+        }
+        if(SupportingBP){
+            vector<string> readnameinfo;
+            boost::split(readnameinfo, read1str[3], boost::is_any_of(":"));
+            TransName.push_back(readnameinfo[2]);
+        }
+        vector<int>::iterator endit;
+        sort(SimpleIdxList.begin(), SimpleIdxList.end());
+        endit=unique(SimpleIdxList.begin(), SimpleIdxList.end());
+        SimpleIdxList.resize(distance(SimpleIdxList.begin(), endit));
+        sort(TRAIdxList.begin(), TRAIdxList.end());
+        endit=unique(TRAIdxList.begin(), TRAIdxList.end());
+        TRAIdxList.resize(distance(TRAIdxList.begin(), endit));
+        for(int i=0; i<SimpleIdxList.size(); i++){
+            countSimpleReads[SimpleIdxList[i]].push_back(Positions);
+            readnameSimpleReads[SimpleIdxList[i]].push_back(read1str[3].substr(0, (int)read1str[3].size()-2));
+        }
+        for(int i=0; i<TRAIdxList.size(); i++){
+            countTRAReads[TRAIdxList[i]].push_back(Positions);
+            readnameTRAReads[TRAIdxList[i]].push_back(read1str[3].substr(0, (int)read1str[3].size()-2));
+        }
+    }
+    input.close();
+
+    sort(TransName.begin(), TransName.end());
+    vector<string>::iterator endittrans=unique(TransName.begin(), TransName.end());
+    TransName.resize(distance(TransName.begin(), endittrans));
+
+    vector<string> ValidReadName;
+    // for same SV ID, if one is covered by reads, mark the others covered.
+    for(int i=0; i<countSimpleReads.size(); i++){
+        int countsupport=0;
+        for(int j=0; j<countSimpleReads[i].size(); j++){
+            // test this read position vector is same as previous ones
+            bool duplicate=false;
+            for(int k=j-1; k>=0; k--){
+                bool same=true;
+                if(countSimpleReads[i][j].size()!=countSimpleReads[i][k].size())
+                    same=false;
+                else{
+                    for(int s=0; s<countSimpleReads[i][j].size(); s++)
+                        if(countSimpleReads[i][j][s]!=countSimpleReads[i][k][s])
+                            same=false;
+                }
+                if(same){
+                    duplicate=true;
+                    break;
+                }
+                if(duplicate)
+                    break;
+            }
+            if(!duplicate){
+                countsupport++;
+                ValidReadName.push_back(readnameSimpleReads[i][j]);
+            }
+        }
+        if(countsupport>threshold)
+            vSimpleReads[i]=true;
+        actualsupport+=countsupport;
+    }
+    for(int i=0; i<countTRAReads.size(); i++){
+        int countsupport=0;
+        for(int j=0; j<countTRAReads[i].size(); j++){
+            // test this read position vector is same as previous ones
+            bool duplicate=false;
+            for(int k=j-1; k>=0; k--){
+                bool same=true;
+                if(countTRAReads[i][j].size()!=countTRAReads[i][k].size())
+                    same=false;
+                else{
+                    for(int s=0; s<countTRAReads[i][j].size(); s++)
+                        if(countTRAReads[i][j][s]!=countTRAReads[i][k][s])
+                            same=false;
+                }
+                if(same){
+                    duplicate=true;
+                    break;
+                }
+                if(duplicate)
+                    break;
+            }
+            if(!duplicate){
+                countsupport++;
+                ValidReadName.push_back(readnameTRAReads[i][j]);
+            }
+        }
+        if(countsupport>threshold)
+            vTRAReads[i]=true;
+        actualsupport+=countsupport;
+    }
+    int idcount=0;
+    for(int i=0; i<vSimpleSV.size(); i++)
+        if(idcount<vSimpleSV[i].ID)
+            idcount=vSimpleSV[i].ID;
+    for(int i=0; i<vTRA.size(); i++)
+        if(idcount<vTRA[i].ID)
+            idcount=vTRA[i].ID;
+    for(int i=0; i<idcount; i++){
+        bool iscovered=false;
+        for(int j=0; j<vSimpleSV.size(); j++)
+            if(vSimpleSV[j].ID==i && vSimpleReads[j])
+                iscovered=true;
+        for(int j=0; j<vTRA.size(); j++)
+            if(vTRA[j].ID==i && vTRAReads[j])
+                iscovered=true;
+        if(iscovered){
+            for(int j=0; j<vSimpleSV.size(); j++)
+                if(vSimpleSV[j].ID==i)
+                    vSimpleReads[j]=true;
+            for(int j=0; j<vTRA.size(); j++)
+                if(vTRA[j].ID==i)
+                    vTRAReads[j]=true;
+        }
+    }
+
+    cout<<"Actual number of TSV supporting reads = "<<actualsupport<<endl;
+    // sort(ValidReadName.begin(), ValidReadName.end());
+    // ValidReadName.resize(distance(ValidReadName.begin(), unique(ValidReadName.begin(), ValidReadName.end())));
+    // for(int i=0; i<ValidReadName.size(); i++)
+    //     cout<<ValidReadName[i]<<endl;
 };

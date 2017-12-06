@@ -410,6 +410,59 @@ def ChimerascanAccuracy(inputfile, outputfile, SVs):
 	fpout.close()
 	print("RawAccuracy = {}\tRawSensitivity = {}".format(hitcount, sum(Hits)))
 
+
+def SoapfuseAccuracy(inputfile, outputfile, SVs):
+	global thresh
+	Hits=[0]*len(SVs)
+	addprefix=False
+	delprefix=False
+	linecount=0
+	fpin=open(inputfile, 'r')
+	fpout=open(outputfile, 'w')
+	hitcount=0
+	for line in fpin:
+		linecount+=1
+		if linecount==1:
+			continue
+		strs=line.strip().split("\t")
+		if linecount==2:
+			if "chr" in strs[1] and "chr" not in SVs[0].BP1.Chr:
+				delprefix=True
+			if "chr" not in strs[1] and "chr" in SVs[0].BP1.Chr:
+				addprefix=True
+		if strs[2]=="-":
+			bp1=BP_t(strs[1], int(strs[3]), True)
+		else:
+			bp1=BP_t(strs[1], int(strs[3]), False)
+		if strs[7]=='+':
+			bp2=BP_t(strs[6], int(strs[8]), True)
+		else:
+			bp2=BP_t(strs[6], int(strs[8]), False)
+		if addprefix:
+			bp1.Chr="chr"+bp1.Chr
+			bp2.Chr="chr"+bp2.Chr
+		if delprefix:
+			bp1.Chr=bp1.Chr[3:]
+			bp2.Chr=bp2.Chr[3:]
+		sfsv=SV_t(bp1, bp2)
+
+		hit=False
+		for i in range(len(SVs)):
+			sv=SVs[i]
+			if sfsv.BP1.Chr==sv.BP1.Chr and sfsv.BP2.Chr==sv.BP2.Chr and abs(sfsv.BP1.Position-sv.BP1.Position)<thresh and abs(sfsv.BP2.Position-sv.BP2.Position)<thresh and sfsv.BP1.IsLeft==sv.BP1.IsLeft and sfsv.BP2.IsLeft==sv.BP2.IsLeft:
+				hit=True
+				Hits[i]=1
+				break
+		if hit:
+			hitcount+=1
+			fpout.write("TP\t"+line)
+		else:
+			fpout.write("FP\t"+line)
+	fpin.close()
+	fpout.close()
+	print("RawAccuracy = {}\tRawSensitivity = {}".format(hitcount, sum(Hits)))
+
+
 if __name__=="__main__":
 	thresh=30000
 	if len(sys.argv)!=4:
@@ -420,6 +473,7 @@ if __name__=="__main__":
 		print("\t4: defuse")
 		print("\t5: chimerascan")
 		print("\t6: integrate")
+		print("\t7: SOAPfuse")
 	else:
 		TrueSV=sys.argv[2]
 		pred=sys.argv[3]
@@ -439,3 +493,5 @@ if __name__=="__main__":
 			ChimerascanAccuracy(pred, out, SVs)
 		elif sys.argv[1]=="6":
 			IntegrateAccuracy(pred, out, SVs)
+		elif sys.argv[1]=="7":
+			SoapfuseAccuracy(pred, out, SVs)

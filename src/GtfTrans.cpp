@@ -128,18 +128,28 @@ void ReadGTF(string filename, vector<Transcript_t>& vTrans, map<string,int>& Ref
 
 	Transcript_t tmpTrans;
 	for(vector<Interval_t>::iterator it=AllExons.begin(); it!=AllExons.end(); it++){
-		if(tmpTrans.vExon.size()==0 || it->TransID==tmpTrans.vExon.back().TransID)
-			tmpTrans.vExon.push_back(*it);
-		else{
+		if(tmpTrans.vExon.size()!=0 && it->TransID!=tmpTrans.vExon.back().TransID){
 			sort(tmpTrans.vExon.begin(), tmpTrans.vExon.end());
 			tmpTrans.TransID=tmpTrans.vExon.front().TransID;
 			tmpTrans.Chr=tmpTrans.vExon.front().Chr;
 			tmpTrans.TxStart=tmpTrans.vExon.front().StartPos;
 			tmpTrans.TxEnd=tmpTrans.vExon.back().EndPos;
+			tmpTrans.Strand=tmpTrans.vExon.front().Strand;
 			vTrans.push_back(tmpTrans);
 			tmpTrans.vExon.clear();
 		}
+		tmpTrans.vExon.push_back(*it);
 	}
+	// add the last one
+	sort(tmpTrans.vExon.begin(), tmpTrans.vExon.end());
+	tmpTrans.TransID=tmpTrans.vExon.front().TransID;
+	tmpTrans.Chr=tmpTrans.vExon.front().Chr;
+	tmpTrans.TxStart=tmpTrans.vExon.front().StartPos;
+	tmpTrans.TxEnd=tmpTrans.vExon.back().EndPos;
+	tmpTrans.Strand=tmpTrans.vExon.front().Strand;
+	vTrans.push_back(tmpTrans);
+	tmpTrans.vExon.clear();
+
 	sort(vTrans.begin(), vTrans.end());
 };
 

@@ -65,8 +65,9 @@ int main(int argc, char* argv[]){
 			vector<Transcript_t> vTrans;
 			vector< vector< pair<AffectExonRelativePos, AffectExonRelativePos> > > AffectedPos;
 			vector<string> TransName;
-			sv.IsCoveredbyReads(argv[4], RefTable, RefLength, TransName, (str=="old"));
 			ReadGTF(argv[6], vTrans, RefTable);
+			// sv.IsCoveredbyReads(argv[4], RefTable, RefLength, TransName, (str=="old"));
+			// sv.IsCoveredbyPolyester(argv[4], vTrans, RefLength, TransName, (str=="old"));
 			FilterGTF(TransName, vTrans);
 			FindAffected(vTrans, sv, AffectedPos);
 			//sv.WriteFilterednewSVPos(RefName, RefLength, argv[3]);
