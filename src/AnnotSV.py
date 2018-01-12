@@ -232,8 +232,6 @@ def ReadGTF(filename):
 				Genes[i].Exons.append(exon)
 				break
 	Genes.sort()
-	for i in range(len(Genes)):
-		Genes[i].UniqSortExons()
 	return Genes
 
 def ReadTrueSV(filename):

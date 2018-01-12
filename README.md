@@ -101,7 +101,7 @@ The downloaded reference file will have the following structure in output direct
 - Homo_sapiens.GRCh38.87.gtf: gene annotation file
 - StarIndex: folder for STAR index
 
-The barcodes of TCGA samples we used are located in [dataTCGA.tgz](https://cmu.box.com/s/ahg15ewlj03tmjd14pk27jpwmntxh68r). After getting RNA-seq fastq files (read1 and read2 in separate files), and make sure STAR and SpeedSeq executable are in your path, running the following command to execute the workflow:
+The barcodes of TCGA samples we used are located in [dataTCGA.tgz](https://cmu.box.com/s/x4t95kdoxnk09lciw5suggpvzcq2t5et). After getting RNA-seq fastq files (read1 and read2 in separate files), and make sure STAR and SpeedSeq executable are in your path, running the following command to execute the workflow:
 ```
 ./scripts/TCGAcommand.sh -p <number threads> -r1 <read1 fastq> -r2 <read2 fastq> -i <StarIndex folder> -g <gtf file> -o <output folder>
 ```
