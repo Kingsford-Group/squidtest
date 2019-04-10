@@ -80,7 +80,16 @@ public:
 	BP_t BP1, BP2;
 public:
 	SV_t(){};
-	SV_t(BP_t BP1, BP_t BP2): BP1(BP1), BP2(BP2){};
+	SV_t(BP_t _BP1, BP_t _BP2){
+		if(_BP1<_BP2){
+			BP1=_BP1;
+			BP2=_BP2;
+		}
+		else{
+			BP1=_BP2;
+			BP2=_BP1;
+		}
+	};
 
 	bool operator < (const SV_t& rhs) const{
 		if(!(BP1==rhs.BP1))
